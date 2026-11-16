@@ -4,10 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UCIC DOOH Display Stage</title>
-    
-    <!-- FIX: Menghilangkan error 404 Favicon -->
     <link rel="icon" href="data:,">
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = { theme: { extend: { colors: { ucicBlue: '#00539C', ucicDark: '#012A54', ucicYellow: '#FFD100' } } } }
@@ -42,13 +39,14 @@
 </head>
 <body class="bg-white text-gray-800">
 
+    <!-- BACKGROUND ANIMATION -->
     <div class="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none">
         <div class="absolute top-[-10%] right-[-5%] w-[40vw] h-[40vw] bg-ucicBlue rounded-full mix-blend-multiply filter blur-[120px] opacity-40 animate-blob"></div>
         <div class="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-ucicDark rounded-full mix-blend-multiply filter blur-[140px] opacity-30 animate-blob animation-delay-2000"></div>
         <div class="absolute top-[20%] left-[30%] w-[30vw] h-[30vw] bg-ucicYellow rounded-full mix-blend-multiply filter blur-[100px] opacity-20 animate-blob animation-delay-4000"></div>
     </div>
 
-    <!-- PAGE 1 -->
+    <!-- PAGE 1 (DEFAULT) -->
     <div id="page1" class="layar active-fade relative bg-transparent">
         <div class="absolute top-8 left-10 lg:left-16 z-50">
             <img src="/logo.png" alt="Logo UCIC" class="h-16 lg:h-20 object-contain">
@@ -67,7 +65,7 @@
         </div>
     </div>
 
-    <!-- PAGE 2 -->
+    <!-- PAGE 2 (HASIL AUDIENS) -->
     <div id="page2" class="layar hidden-fade relative bg-transparent">
         <div class="absolute top-8 left-10 lg:left-16 z-50">
             <img src="/logo.png" alt="Logo UCIC" class="h-16 lg:h-20 object-contain">
@@ -80,7 +78,7 @@
             </p>
         </div>
         
-        <!-- FIX: Hapus onerror hide agar jika gambar lambat dimuat, tetap ditunggu browser -->
+        <!-- FOTO HASIL -->
         <img id="ugc-image" src="" class="absolute bottom-0 right-[2%] lg:right-[5%] max-w-[50vw] h-[85vh] object-contain object-bottom z-10 mask-edges drop-shadow-[0_20px_50px_rgba(0,83,156,0.3)]">
 
         <div class="qr-box text-white text-center flex flex-col items-center">
@@ -118,19 +116,27 @@
             }, 5000); 
         }
 
-        // Cek file status.txt setiap 2 detik
+        // Cek file status.txt
         setInterval(async () => {
             try {
-                // FIX: Menambahkan "/" di depan untuk mengunci path ke root domain
                 const res = await fetch('/status.txt?t=' + new Date().getTime());
                 const currentStatus = await res.text();
 
                 if (currentStatus !== lastStatus && lastStatus !== 0) {
                     lastStatus = currentStatus;
                     
-                    console.log("Foto AI matang! Menampilkan ke Halaman 2...");
-                    // FIX: Menambahkan "/" di depan uploads
+                    console.log("Foto baru matang! Menampilkan ke Halaman 2...");
+                    
+                    // 1. Coba panggil file versi OpenAI (hasil.jpg)
                     ugcImage.src = '/uploads/hasil.jpg?t=' + new Date().getTime();
+                    
+                    // 2. AUTO-FALLBACK: Jika hasil.jpg tidak ada, otomatis pakai terbaru.jpg
+                    ugcImage.onerror = function() {
+                        if (!this.src.includes('terbaru.jpg')) {
+                            console.log("File hasil.jpg tidak ada. Menggunakan fallback terbaru.jpg...");
+                            this.src = '/uploads/terbaru.jpg?t=' + new Date().getTime();
+                        }
+                    };
                     
                     if (loopInterval) clearInterval(loopInterval);
                     showPage(2);
