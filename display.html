@@ -22,7 +22,6 @@
     <style>
         body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #ffffff; }
         
-        /* Mengunci posisi layar agar Halaman 2 tidak terdorong ke bawah Halaman 1 */
         .layar { 
             width: 100vw; 
             height: 100vh; 
@@ -66,7 +65,7 @@
         <div class="absolute top-[20%] left-[30%] w-[30vw] h-[30vw] bg-ucicYellow rounded-full mix-blend-multiply filter blur-[100px] opacity-20 animate-blob animation-delay-4000"></div>
     </div>
 
-    <!-- PAGE 1: TAMPILAN DEFAULT -->
+    <!-- PAGE 1: TAMPILAN DEFAULT (DENGAN QR CODE) -->
     <div id="page1" class="layar active-fade bg-transparent">
         <div class="absolute top-8 left-10 lg:left-16 z-50">
             <img src="logo.png" alt="Logo UCIC" class="h-16 lg:h-20 object-contain">
@@ -77,15 +76,19 @@
             <p class="text-xl lg:text-2xl text-gray-700 font-bold mt-4 bg-white/60 backdrop-blur-sm inline-block px-5 py-2 rounded-xl border border-white/50 shadow-sm">
                 TUNGGU APA LAGI? TAMPILKAN WAJAHMU!
             </p>
+            <p id="ai-cutout-status" class="mt-4 text-base font-bold text-ucicBlue bg-ucicYellow/90 px-4 py-2 rounded-lg hidden animate-pulse shadow-sm">
+                ✨ Menyiapkan foto AI terbaikmu ke Stage...
+            </p>
         </div>
         <img src="model-default.png" class="absolute bottom-0 right-[2%] lg:right-[5%] max-w-[50vw] h-[85vh] object-contain object-bottom z-10 mask-edges drop-shadow-[0_20px_50px_rgba(0,83,156,0.3)]" alt="Model Default">
+        
         <div class="qr-box text-white text-center flex flex-col items-center">
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://billboard.agenticaicenter.id/upload.html" alt="QR" class="rounded bg-white p-1 w-full">
             <p class="text-xs font-bold mt-3 uppercase tracking-wider text-ucicYellow">Scan & Upload Foto<br><span class="text-white text-[10px]">Biar Tampil Di Sini!</span></p>
         </div>
     </div>
 
-    <!-- PAGE 2: HASIL AUDIENS -->
+    <!-- PAGE 2: HASIL AUDIENS (TANPA QR CODE & SILUET TRANSPARAN) -->
     <div id="page2" class="layar hidden-fade bg-transparent">
         <div class="absolute top-8 left-10 lg:left-16 z-50">
             <img src="logo.png" alt="Logo UCIC" class="h-16 lg:h-20 object-contain">
@@ -98,23 +101,23 @@
             </p>
         </div>
         
-        <!-- FOTO HASIL AUDIENS -->
-        <img id="ugc-image" src="uploads/hasil.jpg" alt="Foto Audiens" class="absolute bottom-0 right-[2%] lg:right-[5%] max-w-[50vw] h-[85vh] object-contain object-bottom z-10 mask-edges rounded-t-3xl drop-shadow-[0_20px_50px_rgba(0,83,156,0.3)]">
-
-        <div class="qr-box text-white text-center flex flex-col items-center">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://billboard.agenticaicenter.id/upload.html" alt="QR" class="rounded bg-white p-1 w-full">
-            <p class="text-xs font-bold mt-3 uppercase tracking-wider text-ucicYellow">GILIRANMU!<br><span class="text-white text-[10px]">SCAN SEKARANG</span></p>
-        </div>
+        <!-- FOTO HASIL AUDIENS (Transparan tanpa kotak) -->
+        <img id="ugc-image" src="model-default.png" alt="Foto Audiens" class="absolute bottom-0 right-[5%] lg:right-[8%] max-w-[50vw] h-[88vh] object-contain object-bottom z-10 drop-shadow-[0_20px_50px_rgba(0,83,156,0.35)]">
     </div>
 
-    <script>
+    <!-- SCRIPT UTAMA & PEMOTONG BACKGROUND TRANSPARAN -->
+    <script type="module">
+        import imglyRemoveBackground from "https://unpkg.com/@imgly/background-removal@1.4.3/dist/index.mjs";
+
         const page1 = document.getElementById('page1');
         const page2 = document.getElementById('page2');
         const ugcImage = document.getElementById('ugc-image');
+        const statusBadge = document.getElementById('ai-cutout-status');
         
         let currentState = 1;
         let loopInterval;
         let lastStatus = "";
+        let isProcessingCutout = false;
 
         function showPage(pageNumber) {
             if (pageNumber === 1) {
@@ -131,30 +134,54 @@
         function startLoop() {
             if (loopInterval) clearInterval(loopInterval); 
             loopInterval = setInterval(() => {
-                if (currentState === 1) showPage(2); 
-                else showPage(1);
-            }, 5000); 
+                if (!isProcessingCutout) {
+                    if (currentState === 1) showPage(2); 
+                    else showPage(1);
+                }
+            }, 6000); 
+        }
+
+        // Fungsi menghapus latar belakang agar 100% transparan (tidak kotak)
+        async function muatDanPotongBackground(timestamp, lompatKePage2 = false) {
+            const imgUrl = 'uploads/hasil.jpg?t=' + timestamp;
+            isProcessingCutout = true;
+            if (lompatKePage2) statusBadge.classList.remove('hidden');
+
+            try {
+                const config = { publicPath: "https://unpkg.com/@imgly/background-removal@1.4.3/dist/" };
+                const res = await fetch(imgUrl);
+                const blob = await res.blob();
+                
+                // Kupas background hingga menjadi PNG Transparan murni
+                const transparentBlob = await imglyRemoveBackground(blob, config);
+                ugcImage.src = URL.createObjectURL(transparentBlob);
+            } catch (err) {
+                console.warn("Cutout transparan dilewati, menampilkan foto AI langsung:", err);
+                ugcImage.src = imgUrl;
+            } finally {
+                isProcessingCutout = false;
+                statusBadge.classList.add('hidden');
+                if (lompatKePage2) {
+                    showPage(2);
+                    startLoop();
+                }
+            }
         }
 
         // Cek perubahan status.txt setiap 2 detik
         setInterval(async () => {
+            if (isProcessingCutout) return;
             try {
                 const res = await fetch('status.txt?t=' + new Date().getTime());
                 const currentStatus = (await res.text()).trim();
 
-                if (lastStatus === "") {
-                    // Inisialisasi awal saat halaman pertama kali dibuka
+                if (lastStatus === "" && currentStatus !== "") {
                     lastStatus = currentStatus;
-                    ugcImage.src = 'uploads/hasil.jpg?t=' + currentStatus;
+                    muatDanPotongBackground(currentStatus, false);
                 } else if (currentStatus !== lastStatus && currentStatus !== "") {
-                    // Ada foto baru yang selesai diproses AI!
                     lastStatus = currentStatus;
-                    console.log("Foto AI matang! Menampilkan ke Halaman 2...");
-                    ugcImage.src = 'uploads/hasil.jpg?t=' + currentStatus;
-                    
-                    if (loopInterval) clearInterval(loopInterval);
-                    showPage(2);
-                    startLoop(); 
+                    console.log("Foto baru matang dari server! Memotong background...");
+                    await muatDanPotongBackground(currentStatus, true);
                 }
             } catch (e) {
                 console.log("Gagal memuat status");
