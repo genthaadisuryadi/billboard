@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UCIC DOOH Display Stage</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ucicBlue: '#00539C',   
+                        ucicDark: '#012A54',   
+                        ucicYellow: '#FFD100'  
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #ffffff; }
+        
+        .layar { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; transition: opacity 1s ease-in-out; }
+        
+        .hidden-fade { opacity: 0; pointer-events: none; z-index: 0; }
+        .active-fade { opacity: 1; z-index: 10; }
+        
+        .qr-box { 
+            position: absolute; bottom: 8%; right: 4%; width: 200px; 
+            background: rgba(0, 83, 156, 0.9); backdrop-filter: blur(10px);
+            padding: 15px; border-radius: 12px; border: 2px solid #FFD100;
+            box-shadow: 0 10px 30px rgba(0, 83, 156, 0.3);
+            z-index: 40;
+        }
+        
+        /* Penghalus tepian gambar agar menyatu dengan layar */
+        .mask-edges {
+            -webkit-mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0%, black 15%, black 85%, transparent 100%);
+        }
+
+        /* Animasi Orbs di Background */
+        @keyframes blob {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob { animation: blob 10s infinite alternate; }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
+    </style>
+</head>
+<body class="bg-white text-gray-800">
+
+    <!-- BACKGROUND SHADOW ABSTRAK (ANIMATED BLOBS) -->
+    <div class="fixed inset-0 w-full h-full z-0 overflow-hidden pointer-events-none">
+        <div class="absolute top-[-10%] right-[-5%] w-[40vw] h-[40vw] bg-ucicBlue rounded-full mix-blend-multiply filter blur-[120px] opacity-40 animate-blob"></div>
+        <div class="absolute bottom-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-ucicDark rounded-full mix-blend-multiply filter blur-[140px] opacity-30 animate-blob animation-delay-2000"></div>
+        <div class="absolute top-[20%] left-[30%] w-[30vw] h-[30vw] bg-ucicYellow rounded-full mix-blend-multiply filter blur-[100px] opacity-20 animate-blob animation-delay-4000"></div>
+    </div>
+
+    <!-- ==============================================
+         PAGE 1: TAMPILAN DEFAULT 
+         ============================================== -->
+    <div id="page1" class="layar active-fade relative bg-transparent">
+        
+        <!-- LOGO UCIC -->
+        <div class="absolute top-8 left-10 lg:left-16 z-50">
+            <img src="logo.png" alt="Logo UCIC" class="h-16 lg:h-20 object-contain">
+        </div>
+
+        <!-- BAGIAN KIRI: Teks Kampanye -->
+        <div class="absolute top-[25%] left-10 lg:left-16 z-30 w-[50%] lg:w-[45%] pr-4">
+            <h2 class="text-3xl lg:text-4xl font-extrabold text-ucicBlue tracking-widest mb-2 uppercase drop-shadow-sm">
+                UCIC GREAT!
+            </h2>
+            <h1 class="text-5xl lg:text-[4.5rem] xl:text-[5rem] font-black italic text-ucicDark leading-tight mb-4 tracking-tight drop-shadow-sm">
+                #KampusTeknologiAI
+            </h1>
+            <p class="text-xl lg:text-2xl text-gray-700 font-bold mt-4 bg-white/60 backdrop-blur-sm inline-block px-5 py-2 rounded-xl border border-white/50 shadow-sm">
+                TUNGGU APA LAGI? TAMPILKAN WAJAHMU!
+            </p>
+            
+            <!-- Teks Indikator Loading AI di Layar Laptop -->
+            <p id="ai-status" class="mt-6 text-xl font-bold text-ucicBlue animate-pulse bg-ucicYellow/90 inline-block px-4 py-2 rounded-lg hidden shadow-md">
+                🤖 Mendeteksi foto baru... AI UCIC sedang memotong background...
+            </p>
+        </div>
+        
+        <!-- BAGIAN KANAN: Foto Model Default -->
+        <img id="model-bintang" src="model-default.png" class="absolute bottom-0 right-[2%] lg:right-[5%] max-w-[50vw] h-[85vh] object-contain object-bottom z-10 mask-edges drop-shadow-[0_20px_50px_rgba(0,83,156,0.3)]" alt="Model Default">
+        
+        <!-- BAGIAN KANAN BAWAH: QR Code -->
+        <div class="qr-box text-white text-center flex flex-col items-center">
+            
+            <!-- ====== URL HOSTING PERMANEN ====== -->
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://billboard.agenticaicenter.id/upload.html" alt="QR" class="rounded bg-white p-1 w-full">
+            
+            <p class="text-xs font-bold mt-3 uppercase tracking-wider text-ucicYellow">
+                Scan & Upload Foto<br><span class="text-white text-[10px]">Biar Tampil Di Sini!</span>
+            </p>
+        </div>
+    </div>
+
+
+    <!-- ==============================================
+         PAGE 2: TAMPILAN UGC (FOTO AUDIENS)
+         ============================================== -->
+    <div id="page2" class="layar hidden-fade relative bg-transparent">
+        
+        <!-- LOGO UCIC -->
+        <div class="absolute top-8 left-10 lg:left-16 z-50">
+            <img src="logo.png" alt="Logo UCIC" class="h-16 lg:h-20 object-contain">
+        </div>
+
+        <!-- BAGIAN KIRI: Teks UGC -->
+        <div class="absolute top-[25%] left-10 lg:left-16 z-30 w-[50%] lg:w-[45%] pr-4">
+            <h2 class="text-3xl lg:text-4xl font-extrabold text-ucicBlue tracking-widest mb-2 uppercase drop-shadow-sm">
+                UCIC GREAT!
+            </h2>
+            <h1 class="text-5xl lg:text-[4.5rem] xl:text-[5rem] font-black italic text-ucicDark leading-tight mb-4 tracking-tight drop-shadow-sm">
+                #KampusTeknologiAI
+            </h1>
+            <p class="text-xl lg:text-2xl text-ucicBlue font-black mt-4 animate-pulse bg-ucicYellow/90 inline-block px-6 py-2 rounded-full shadow-lg border border-ucicYellow">
+                GILIRANMU BERSINAR!
+            </p>
+        </div>
+        
+        <!-- BAGIAN KANAN: Foto Audiens (Yang sudah dipotong AI Laptop) -->
+        <img id="ugc-image" src="" alt="Audiens" class="absolute bottom-0 right-[2%] lg:right-[5%] max-w-[50vw] h-[85vh] object-contain object-bottom z-10 mask-edges drop-shadow-[0_20px_50px_rgba(0,83,156,0.3)]" onerror="this.style.display='none'" onload="this.style.display='block'">
+
+        <!-- BAGIAN KANAN BAWAH: QR Code -->
+        <div class="qr-box text-white text-center flex flex-col items-center">
+            
+            <!-- ====== URL HOSTING PERMANEN ====== -->
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://billboard.agenticaicenter.id/upload.html" alt="QR" class="rounded bg-white p-1 w-full">
+            
+            <p class="text-xs font-bold mt-3 uppercase tracking-wider text-ucicYellow">
+                GILIRANMU!<br><span class="text-white text-[10px]">SCAN SEKARANG</span>
+            </p>
+        </div>
+    </div>
+
+    <!-- SCRIPT 1: LOGIKA UI UTAMA (Rotasi 5 Detik) -->
+    <script>
+        const page1 = document.getElementById('page1');
+        const page2 = document.getElementById('page2');
+        
+        window.ugcImage = document.getElementById('ugc-image');
+        window.aiStatus = document.getElementById('ai-status');
+        
+        let currentState = 1;
+        let loopInterval;
+
+        window.showPage = function(pageNumber) {
+            if (pageNumber === 1) {
+                page1.classList.replace('hidden-fade', 'active-fade');
+                page2.classList.replace('active-fade', 'hidden-fade');
+                currentState = 1;
+            } else {
+                page2.classList.replace('hidden-fade', 'active-fade');
+                page1.classList.replace('active-fade', 'hidden-fade');
+                currentState = 2;
+            }
+        }
+
+        window.startLoop = function() {
+            if (loopInterval) clearInterval(loopInterval); 
+            loopInterval = setInterval(() => {
+                if (currentState === 1) { window.showPage(2); } else { window.showPage(1); }
+            }, 5000); 
+        }
+
+        // Langsung mulai loop sejak layar dinyalakan
+        window.startLoop();
+    </script>
+
+    <!-- SCRIPT 2: HTTP POLLING & AI MODULE -->
+    <script type="module">
+        import imglyRemoveBackground from "https://unpkg.com/@imgly/background-removal@1.4.3/dist/index.mjs";
+
+        let lastStatus = 0; // Menyimpan waktu terakhir foto diupload
+
+        // Fungsi mengecek file status.txt setiap 2 detik di server hosting
+        setInterval(async () => {
+            try {
+                // Tambahkan random parameter (t=...) agar browser tidak mencache file txt lama
+                const res = await fetch('status.txt?t=' + new Date().getTime());
+                const currentStatus = await res.text();
+
+                // Jika ada perubahan angka (berarti ada audiens yang baru upload foto)
+                if (currentStatus !== lastStatus && lastStatus !== 0) {
+                    lastStatus = currentStatus;
+                    mulaiProsesAI(); 
+                } else if (lastStatus === 0) {
+                    lastStatus = currentStatus; // Setup awal saat web baru dibuka
+                }
+            } catch (e) {
+                // Hening jika sesekali gagal cek status agar tidak mengganggu UI
+            }
+        }, 2000);
+
+        // FUNGSI MEMPROSES GAMBAR DARI FOLDER UPLOADS
+        async function mulaiProsesAI() {
+            console.log("Mendeteksi gambar baru di folder uploads! Memulai AI...");
+            
+            // Hentikan sementara rotasi & munculkan teks loading
+            if (loopInterval) clearInterval(loopInterval);
+            window.showPage(1); 
+            window.aiStatus.style.display = 'inline-block';
+
+            try {
+                const config = { publicPath: "https://unpkg.com/@imgly/background-removal@1.4.3/dist/" };
+                
+                // Ambil gambar terbaru dari folder hosting (pakai parameter waktu agar tidak kena cache)
+                const imgRes = await fetch('uploads/terbaru.jpg?t=' + new Date().getTime());
+                const blob = await imgRes.blob();
+
+                // Eksekusi potong background
+                const processedBlob = await imglyRemoveBackground(blob, config);
+                const url = URL.createObjectURL(processedBlob);
+
+                // Tampilkan hasil, pindah ke Halaman 2, reset putaran waktu!
+                window.ugcImage.src = url;
+                window.aiStatus.style.display = 'none';
+                window.showPage(2); 
+                window.startLoop(); 
+                
+            } catch (error) {
+                console.error("AI Error:", error);
+                window.aiStatus.innerText = "❌ Proses gagal memotong foto.";
+                setTimeout(() => { window.aiStatus.style.display = 'none'; window.startLoop(); }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>
