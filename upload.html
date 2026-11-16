@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jadilah Bintang UCIC!</title>
+    <!-- FIX: Menghilangkan error 404 favicon di halaman upload -->
+    <link rel="icon" href="data:,">
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-blue-950 text-white flex flex-col items-center justify-center min-h-screen p-4">
     <div class="bg-blue-900 p-6 rounded-3xl shadow-2xl w-full max-w-sm text-center border border-blue-700">
         <h1 class="text-2xl font-extrabold mb-2 uppercase italic text-yellow-400">Tampil di Stage!</h1>
-        <p class="text-sm mb-6 text-gray-300">Ambil selfie terbaikmu. Kami akan menayangkannya di layar utama!</p>
+        <p class="text-sm mb-6 text-gray-300">Ambil selfie terbaikmu. AI kami akan memakaikan Jas Almamater UCIC dan menayangkannya di layar utama!</p>
 
         <input type="file" id="fotoInput" accept="image/*" capture="user" class="hidden">
         <label for="fotoInput" id="btnUpload" class="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-400 text-white font-bold py-4 px-6 rounded-full cursor-pointer flex justify-center items-center w-full mb-4 shadow-lg transition-transform transform hover:scale-105">
@@ -18,7 +20,7 @@
 
         <div id="loading" class="hidden mt-6 mb-4">
             <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-yellow-400 mx-auto"></div>
-            <p class="text-xs mt-3 text-blue-200 font-semibold animate-pulse">Memproses & Mengirim foto...</p>
+            <p class="text-xs mt-3 text-yellow-300 font-bold animate-pulse">🤖 AI sedang memproses Jas Almamater UCIC & menghapus background (10-20 detik)...</p>
         </div>
     </div>
 
@@ -34,32 +36,29 @@
             btnUpload.classList.add('hidden');
             loading.classList.remove('hidden');
 
-            // MENGECILKAN FOTO DI HP (SANGAT RAMAH RAM KARENA AI SUDAH DIHAPUS DARI HP)
             const img = new Image();
             const url = URL.createObjectURL(file);
             
             img.onload = function() {
-                URL.revokeObjectURL(url); // Hapus dari memori untuk cegah RAM penuh
+                URL.revokeObjectURL(url);
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Perkecil maksimal resolusi 800px
-                const MAX_WIDTH = 800; const MAX_HEIGHT = 800;
-                let width = img.width; let height = img.height;
+                // Ukuran 1024x1024 persegi agar sesuai standar terbaik OpenAI Image Edit
+                const SIZE = 1024;
+                canvas.width = SIZE;
+                canvas.height = SIZE;
                 
-                if (width > height) {
-                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
-                } else {
-                    if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
-                }
-                
-                canvas.width = width; canvas.height = height;
-                ctx.drawImage(img, 0, 0, width, height);
+                // Crop tengah secara proporsional (Square)
+                const minSide = Math.min(img.width, img.height);
+                const sx = (img.width - minSide) / 2;
+                const sy = (img.height - minSide) / 2;
+                ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, SIZE, SIZE);
 
-                // Ubah menjadi Blob (File) JPEG dan Kirim ke Server
+                // Kirim langsung dalam format PNG
                 canvas.toBlob((blob) => {
                     const formData = new FormData();
-                    formData.append("foto_audiens", blob, "selfie.jpg");
+                    formData.append("foto_audiens", blob, "image.png");
 
                     fetch('upload.php', {
                         method: 'POST',
@@ -68,17 +67,18 @@
                     .then(async response => {
                         const text = await response.text();
                         try {
-                            return JSON.parse(text); // Coba baca sebagai JSON
+                            return JSON.parse(text);
                         } catch (err) {
-                            throw new Error("Sistem Server Error: " + text); // Jika PHP error (bukan JSON)
+                            throw new Error("Respon server: " + text);
                         }
                     })
                     .then(data => {
-                        if(data.status === "success") {
+                        console.log("Hasil Server:", data);
+                        if (data.status === "success") {
                             document.body.innerHTML = `
                                 <div class="text-center p-6 flex flex-col justify-center items-center h-screen bg-blue-950">
-                                    <h1 class="text-5xl font-black mb-4 text-green-400 drop-shadow-md">Terkirim! 🚀</h1>
-                                    <p class="text-lg font-medium text-gray-200 mt-4">AI Server sedang bekerja.<br>Lihat layar Stage sekarang!</p>
+                                    <h1 class="text-5xl font-black mb-4 text-green-400 drop-shadow-md">Berhasil! 🚀</h1>
+                                    <p class="text-lg font-medium text-gray-200 mt-2">Lihat layar Stage sekarang!</p>
                                 </div>
                             `;
                         } else {
@@ -87,10 +87,10 @@
                         }
                     })
                     .catch(err => {
-                        alert("Gagal mengunggah foto. Detail: " + err.message);
+                        alert("Gagal upload foto: " + err.message);
                         resetUI();
                     });
-                }, 'image/jpeg', 0.8);
+                }, 'image/png');
             };
             img.src = url;
         });

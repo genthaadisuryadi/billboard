@@ -76,9 +76,6 @@
             <p class="text-xl lg:text-2xl text-gray-700 font-bold mt-4 bg-white/60 backdrop-blur-sm inline-block px-5 py-2 rounded-xl border border-white/50 shadow-sm">
                 TUNGGU APA LAGI? TAMPILKAN WAJAHMU!
             </p>
-            <p id="ai-cutout-status" class="mt-4 text-base font-bold text-ucicBlue bg-ucicYellow/90 px-4 py-2 rounded-lg hidden animate-pulse shadow-sm">
-                ✨ Menyiapkan foto AI terbaikmu ke Stage...
-            </p>
         </div>
         <img src="model-default.png" class="absolute bottom-0 right-[2%] lg:right-[5%] max-w-[50vw] h-[85vh] object-contain object-bottom z-10 mask-edges drop-shadow-[0_20px_50px_rgba(0,83,156,0.3)]" alt="Model Default">
         
@@ -88,7 +85,7 @@
         </div>
     </div>
 
-    <!-- PAGE 2: HASIL AUDIENS (TANPA QR CODE & SILUET TRANSPARAN) -->
+    <!-- PAGE 2: HASIL AUDIENS (TANPA QR CODE & TANPA KOTAK BACKGROUND) -->
     <div id="page2" class="layar hidden-fade bg-transparent">
         <div class="absolute top-8 left-10 lg:left-16 z-50">
             <img src="logo.png" alt="Logo UCIC" class="h-16 lg:h-20 object-contain">
@@ -101,23 +98,19 @@
             </p>
         </div>
         
-        <!-- FOTO HASIL AUDIENS (Transparan tanpa kotak) -->
+        <!-- FOTO HASIL AUDIENS -->
         <img id="ugc-image" src="model-default.png" alt="Foto Audiens" class="absolute bottom-0 right-[5%] lg:right-[8%] max-w-[50vw] h-[88vh] object-contain object-bottom z-10 drop-shadow-[0_20px_50px_rgba(0,83,156,0.35)]">
     </div>
 
-    <!-- SCRIPT UTAMA & PEMOTONG BACKGROUND TRANSPARAN -->
-    <script type="module">
-        import imglyRemoveBackground from "https://unpkg.com/@imgly/background-removal@1.4.3/dist/index.mjs";
-
+    <!-- SCRIPT MURNI (TANPA LIBRARY EKSTERNAL YANG BISA ERROR) -->
+    <script>
         const page1 = document.getElementById('page1');
         const page2 = document.getElementById('page2');
         const ugcImage = document.getElementById('ugc-image');
-        const statusBadge = document.getElementById('ai-cutout-status');
         
         let currentState = 1;
         let loopInterval;
         let lastStatus = "";
-        let isProcessingCutout = false;
 
         function showPage(pageNumber) {
             if (pageNumber === 1) {
@@ -134,57 +127,101 @@
         function startLoop() {
             if (loopInterval) clearInterval(loopInterval); 
             loopInterval = setInterval(() => {
-                if (!isProcessingCutout) {
-                    if (currentState === 1) showPage(2); 
-                    else showPage(1);
-                }
+                if (currentState === 1) showPage(2); 
+                else showPage(1);
             }, 6000); 
         }
 
-        // Fungsi menghapus latar belakang agar 100% transparan (tidak kotak)
-        async function muatDanPotongBackground(timestamp, lompatKePage2 = false) {
-            const imgUrl = 'uploads/hasil.jpg?t=' + timestamp;
-            isProcessingCutout = true;
-            if (lompatKePage2) statusBadge.classList.remove('hidden');
+        // Fungsi Canvas Flood-Fill: Menghapus background putih dari tepi luar menjadi transparan
+        // tanpa menghapus kemeja putih di bagian dalam jas almamater biru dongker
+        function hapusBackgroundPutih(imgUrl, callback) {
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.onload = function() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const w = img.width;
+                    const h = img.height;
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
 
-            try {
-                const config = { publicPath: "https://unpkg.com/@imgly/background-removal@1.4.3/dist/" };
-                const res = await fetch(imgUrl);
-                const blob = await res.blob();
-                
-                // Kupas background hingga menjadi PNG Transparan murni
-                const transparentBlob = await imglyRemoveBackground(blob, config);
-                ugcImage.src = URL.createObjectURL(transparentBlob);
-            } catch (err) {
-                console.warn("Cutout transparan dilewati, menampilkan foto AI langsung:", err);
-                ugcImage.src = imgUrl;
-            } finally {
-                isProcessingCutout = false;
-                statusBadge.classList.add('hidden');
-                if (lompatKePage2) {
-                    showPage(2);
-                    startLoop();
+                    const imgData = ctx.getImageData(0, 0, w, h);
+                    const data = imgData.data;
+                    const visited = new Uint8Array(w * h);
+                    const queue = [];
+
+                    // Cek apakah piksel berwarna putih/terang (background studio AI)
+                    function isBgLight(idx) {
+                        const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+                        if (a < 20) return true;
+                        return (r > 228 && g > 228 && b > 228 && Math.abs(r - g) < 18 && Math.abs(g - b) < 18);
+                    }
+
+                    // Mulai telusuri hanya dari tepi ATAS, KIRI, dan KANAN (agar kemeja dalam tetap aman)
+                    for (let x = 0; x < w; x++) {
+                        queue.push(x); // Tepi atas
+                        visited[x] = 1;
+                    }
+                    for (let y = 0; y < h; y++) {
+                        let leftIdx = y * w;
+                        let rightIdx = y * w + (w - 1);
+                        if (!visited[leftIdx]) { queue.push(leftIdx); visited[leftIdx] = 1; }
+                        if (!visited[rightIdx]) { queue.push(rightIdx); visited[rightIdx] = 1; }
+                    }
+
+                    let head = 0;
+                    while (head < queue.length) {
+                        const pos = queue[head++];
+                        const pIdx = pos * 4;
+
+                        if (isBgLight(pIdx)) {
+                            data[pIdx + 3] = 0; // Jadikan 100% Transparan
+                            const x = pos % w;
+                            const y = (pos - x) / w;
+
+                            if (x > 0 && !visited[pos - 1]) { visited[pos - 1] = 1; queue.push(pos - 1); }
+                            if (x < w - 1 && !visited[pos + 1]) { visited[pos + 1] = 1; queue.push(pos + 1); }
+                            if (y > 0 && !visited[pos - w]) { visited[pos - w] = 1; queue.push(pos - w); }
+                            if (y < h - 1 && !visited[pos + w]) { visited[pos + w] = 1; queue.push(pos + w); }
+                        }
+                    }
+
+                    ctx.putImageData(imgData, 0, 0);
+                    ugcImage.src = canvas.toDataURL('image/png');
+                } catch (e) {
+                    ugcImage.src = imgUrl;
                 }
-            }
+                if (callback) callback();
+            };
+            img.onerror = function() {
+                ugcImage.src = imgUrl;
+                if (callback) callback();
+            };
+            img.src = imgUrl;
         }
 
-        // Cek perubahan status.txt setiap 2 detik
+        // Cek file status.txt setiap 2 detik
         setInterval(async () => {
-            if (isProcessingCutout) return;
             try {
                 const res = await fetch('status.txt?t=' + new Date().getTime());
                 const currentStatus = (await res.text()).trim();
 
                 if (lastStatus === "" && currentStatus !== "") {
                     lastStatus = currentStatus;
-                    muatDanPotongBackground(currentStatus, false);
+                    hapusBackgroundPutih('uploads/hasil.jpg?t=' + currentStatus);
                 } else if (currentStatus !== lastStatus && currentStatus !== "") {
                     lastStatus = currentStatus;
-                    console.log("Foto baru matang dari server! Memotong background...");
-                    await muatDanPotongBackground(currentStatus, true);
+                    console.log("Foto baru selesai diproses! Menampilkan ke Halaman 2...");
+                    hapusBackgroundPutih('uploads/hasil.jpg?t=' + currentStatus, () => {
+                        if (loopInterval) clearInterval(loopInterval);
+                        showPage(2);
+                        startLoop();
+                    });
                 }
             } catch (e) {
-                console.log("Gagal memuat status");
+                console.log("Menunggu sinyal status...");
             }
         }, 2000);
 

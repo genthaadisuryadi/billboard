@@ -3,21 +3,20 @@ header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
 
 // =========================================================================
-// 1. PROMPT AI (JAS ALMAMATER UCIC & HAPUS BACKGROUND RUANGAN)
+// 1. PROMPT AI (JAS ALMAMATER UCIC BIRU DONGKER & HAPUS BACKGROUND)
 // =========================================================================
-$prompt_ai = "Transform this photo into a high-resolution commercial studio portrait for Universitas Catur Insan Cendekia (UCIC). "
-           . "CRITICAL FACE & POSE RULE: Strictly preserve the exact facial features, face identity, skin tone, glasses, hair/hijab, and exact hand gesture/pose of the person. "
-           . "OUTFIT RULE: Replace the person's clothes with an official university almamater blazer jacket in dark navy blue (#012A54) worn open over a clean, neat white inner shirt. "
-           . "Add a small square white emblem patch featuring a blue and yellow university shield logo on the left chest of the navy blazer. "
-           . "BACKGROUND RULE: Completely remove the original room, walls, and objects behind the person. Isolate the subject on a pure, solid, flat white background (#FFFFFF) with clean studio rim lighting.";
+$prompt_ai = "Transform this photo into a high-resolution studio portrait for Universitas Catur Insan Cendekia (UCIC). "
+           . "CRITICAL FACE RULE: Strictly preserve the exact facial features, face identity, glasses, hair/hijab, and expression of the person. "
+           . "OUTFIT RULE: Dress the person in an official university almamater blazer jacket in dark navy blue (#012A54) worn over a neat white inner shirt, featuring a small square white emblem patch with a blue and yellow university shield logo on the left chest of the navy blazer. "
+           . "BACKGROUND RULE: Completely remove the original background and walls. Isolate the subject on a pure, solid, flat white background (#FFFFFF) with clean studio lighting.";
 
 // =========================================================================
-// 2. BACA API KEY DARI SERVER (Prioritas: folder /api lalu /photobooth)
+// 2. BACA API KEY DARI SERVER (Otomatis dari /api atau /photobooth)
 // =========================================================================
 $settings_files = ["../api/settings.json", "../photobooth/settings.json"];
 $api_key = "";
 $base_url = "https://api.openai.com/v1";
-$model = "gpt-image-2.5-sunburst";
+$model_utama = "gpt-image-2.5-sunburst";
 
 foreach ($settings_files as $path) {
     if (file_exists($path)) {
@@ -25,7 +24,7 @@ foreach ($settings_files as $path) {
         if (!empty($cfg['apiKey'])) {
             $api_key = $cfg['apiKey'];
             if (!empty($cfg['apiBaseUrl'])) $base_url = rtrim($cfg['apiBaseUrl'], '/');
-            if (!empty($cfg['aiModel'])) $model = $cfg['aiModel'];
+            if (!empty($cfg['aiModel'])) $model_utama = $cfg['aiModel'];
             break;
         }
     }
@@ -38,12 +37,37 @@ if (!file_exists($target_dir)) {
     mkdir($target_dir, 0777, true);
 }
 
+// Fungsi menembak API OpenAI /images/edits
+function tembakOpenAI($endpoint, $api_key, $file_path, $prompt, $model) {
+    $cfile = new CURLFile(realpath($file_path), 'image/png', 'image.png');
+    $post_fields = [
+        'image' => $cfile,
+        'prompt' => $prompt,
+        'model' => $model,
+        'n' => '1'
+    ];
+
+    $ch = curl_init($endpoint);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $post_fields);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "Authorization: Bearer " . $api_key
+    ]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 90);
+
+    $response = curl_exec($ch);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    return [$response, $err];
+}
+
 if (isset($_FILES["foto_audiens"])) {
     $temp_file = $_FILES["foto_audiens"]["tmp_name"];
     $mentah_png = $target_dir . "mentah.png";
     $hasil_file = $target_dir . "hasil.jpg";
 
-    // 3. KONVERSI KE PNG MURNI AGAR TIDAK DITOLAK OLEH /images/edits OPENAI
     $img_data = file_get_contents($temp_file);
     $src_img = @imagecreatefromstring($img_data);
     if ($src_img !== false) {
@@ -54,32 +78,20 @@ if (isset($_FILES["foto_audiens"])) {
     }
 
     if (file_exists($mentah_png)) {
-        $cfile = new CURLFile(realpath($mentah_png), 'image/png', 'image.png');
-        $post_fields = [
-            'image' => $cfile,
-            'prompt' => $prompt_ai,
-            'model' => $model,
-            'n' => '1'
-        ];
+        // Percobaan 1: Gunakan model dari settings.json (gpt-image-2.5-sunburst)
+        list($response, $err) = tembakOpenAI($endpoint, $api_key, $mentah_png, $prompt_ai, $model_utama);
+        $data = json_decode($response, true);
 
-        $ch = curl_init($endpoint);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $post_fields);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "Authorization: Bearer " . $api_key
-        ]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 90);
-
-        $response = curl_exec($ch);
-        $err = curl_error($ch);
-        curl_close($ch);
+        // Percobaan 2 (Auto-Fallback): Jika model utama error/tidak dikenali, otomatis coba model 'gpt-image-1'
+        if (isset($data['error']) && $model_utama !== 'gpt-image-1') {
+            list($response, $err) = tembakOpenAI($endpoint, $api_key, $mentah_png, $prompt_ai, 'gpt-image-1');
+            $data = json_decode($response, true);
+        }
 
         $sukses_ai = false;
         $ai_error_msg = "";
 
-        if (!$err && $response) {
-            $data = json_decode($response, true);
+        if (!$err && is_array($data)) {
             if (isset($data['data'][0]['b64_json'])) {
                 $img_binary = base64_decode($data['data'][0]['b64_json']);
                 if ($img_binary) {
@@ -94,15 +106,12 @@ if (isset($_FILES["foto_audiens"])) {
                 }
             } elseif (isset($data['error']['message'])) {
                 $ai_error_msg = $data['error']['message'];
-            } else {
-                $ai_error_msg = "Format respon tidak dikenali: " . substr($response, 0, 200);
             }
         } else {
-            $ai_error_msg = $err;
+            $ai_error_msg = $err ?: "Respon kosong dari server AI";
         }
 
-        // Catat di ai_log.txt untuk memantau status AI
-        file_put_contents("ai_log.txt", date("Y-m-d H:i:s") . " | Model: $model | Sukses: " . ($sukses_ai ? "YA" : "TIDAK") . " | Info: " . $ai_error_msg . "\n", FILE_APPEND);
+        file_put_contents("ai_log.txt", date("Y-m-d H:i:s") . " | Sukses: " . ($sukses_ai ? "YA" : "TIDAK") . " | Info: " . $ai_error_msg . "\n", FILE_APPEND);
 
         if (!$sukses_ai) {
             copy($mentah_png, $hasil_file);
