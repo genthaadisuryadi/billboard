@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jadilah Bintang UCIC!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-blue-950 text-white flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="bg-blue-900 p-6 rounded-3xl shadow-2xl w-full max-w-sm text-center border border-blue-700">
+        <h1 class="text-2xl font-extrabold mb-2 uppercase italic text-yellow-400">Tampil di Stage!</h1>
+        <p class="text-sm mb-6 text-gray-300">Ambil selfie terbaikmu. Kami akan memprosesnya ke layar utama!</p>
+
+        <input type="file" id="fotoInput" accept="image/*" capture="user" class="hidden">
+        <label for="fotoInput" id="btnUpload" class="bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-400 hover:to-blue-600 text-white font-bold py-4 px-6 rounded-full cursor-pointer flex justify-center items-center w-full mb-4 shadow-lg transition-transform transform hover:scale-105">
+            📸 Buka Kamera
+        </label>
+
+        <div id="loading" class="hidden mt-6 mb-4">
+            <div class="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-yellow-400 mx-auto"></div>
+            <p class="text-xs mt-3 text-blue-200 font-semibold animate-pulse">Mengompres & Mengirim foto...</p>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const fotoInput = document.getElementById('fotoInput');
+        const loading = document.getElementById('loading');
+        const btnUpload = document.getElementById('btnUpload');
+
+        fotoInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            btnUpload.classList.add('hidden');
+            loading.classList.remove('hidden');
+
+            // FITUR BARU: Kompresi Gambar via Canvas (Anti Error Memori HP)
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+
+            img.onload = function() {
+                URL.revokeObjectURL(url); // Bersihkan cache memori browser
+                
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Batasi resolusi maksimal 800px (Sangat ringan)
+                const MAX_WIDTH = 800;
+                const MAX_HEIGHT = 800;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Ubah ke JPEG kualitas 80% (Ukuran file turun drastis dari 10MB jadi ~150KB)
+                const base64Data = canvas.toDataURL('image/jpeg', 0.8);
+                
+                // Kirim ke server
+                socket.emit('kirim_raw_foto', { image: base64Data });
+
+                // UI Sukses
+                setTimeout(() => {
+                    document.body.innerHTML = `
+                        <div class="text-center p-6 flex flex-col justify-center items-center h-screen bg-blue-950">
+                            <h1 class="text-5xl font-black mb-4 text-green-400 drop-shadow-md">Terkirim! 🚀</h1>
+                            <p class="text-lg font-medium text-gray-200 mt-4">Foto diproses AI Laptop.<br>Cek layar Stage sekarang!</p>
+                        </div>
+                    `;
+                }, 500);
+            };
+
+            img.onerror = function() {
+                alert("Gagal membaca gambar.");
+                loading.classList.add('hidden');
+                btnUpload.classList.remove('hidden');
+            };
+
+            img.src = url;
+        });
+    </script>
+</body>
+</html>
