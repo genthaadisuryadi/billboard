@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>UCIC DOOH Display Stage</title>
+    
+    <!-- FIX: Menghilangkan error 404 Favicon -->
+    <link rel="icon" href="data:,">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = { theme: { extend: { colors: { ucicBlue: '#00539C', ucicDark: '#012A54', ucicYellow: '#FFD100' } } } }
@@ -44,10 +48,10 @@
         <div class="absolute top-[20%] left-[30%] w-[30vw] h-[30vw] bg-ucicYellow rounded-full mix-blend-multiply filter blur-[100px] opacity-20 animate-blob animation-delay-4000"></div>
     </div>
 
-    <!-- PAGE 1: TAMPILAN DEFAULT -->
+    <!-- PAGE 1 -->
     <div id="page1" class="layar active-fade relative bg-transparent">
         <div class="absolute top-8 left-10 lg:left-16 z-50">
-            <img src="logo.png" alt="Logo UCIC" class="h-16 lg:h-20 object-contain">
+            <img src="/logo.png" alt="Logo UCIC" class="h-16 lg:h-20 object-contain">
         </div>
         <div class="absolute top-[25%] left-10 lg:left-16 z-30 w-[50%] lg:w-[45%] pr-4">
             <h2 class="text-3xl lg:text-4xl font-extrabold text-ucicBlue tracking-widest mb-2 uppercase drop-shadow-sm">UCIC GREAT!</h2>
@@ -56,17 +60,17 @@
                 TUNGGU APA LAGI? TAMPILKAN WAJAHMU!
             </p>
         </div>
-        <img src="model-default.png" class="absolute bottom-0 right-[2%] lg:right-[5%] max-w-[50vw] h-[85vh] object-contain object-bottom z-10 mask-edges drop-shadow-[0_20px_50px_rgba(0,83,156,0.3)]" alt="Model Default">
+        <img src="/model-default.png" class="absolute bottom-0 right-[2%] lg:right-[5%] max-w-[50vw] h-[85vh] object-contain object-bottom z-10 mask-edges drop-shadow-[0_20px_50px_rgba(0,83,156,0.3)]">
         <div class="qr-box text-white text-center flex flex-col items-center">
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://billboard.agenticaicenter.id/upload.html" alt="QR" class="rounded bg-white p-1 w-full">
             <p class="text-xs font-bold mt-3 uppercase tracking-wider text-ucicYellow">Scan & Upload Foto<br><span class="text-white text-[10px]">Biar Tampil Di Sini!</span></p>
         </div>
     </div>
 
-    <!-- PAGE 2: HASIL AI OPENAI -->
+    <!-- PAGE 2 -->
     <div id="page2" class="layar hidden-fade relative bg-transparent">
         <div class="absolute top-8 left-10 lg:left-16 z-50">
-            <img src="logo.png" alt="Logo UCIC" class="h-16 lg:h-20 object-contain">
+            <img src="/logo.png" alt="Logo UCIC" class="h-16 lg:h-20 object-contain">
         </div>
         <div class="absolute top-[25%] left-10 lg:left-16 z-30 w-[50%] lg:w-[45%] pr-4">
             <h2 class="text-3xl lg:text-4xl font-extrabold text-ucicBlue tracking-widest mb-2 uppercase drop-shadow-sm">UCIC GREAT!</h2>
@@ -76,8 +80,8 @@
             </p>
         </div>
         
-        <!-- FOTO HASIL AI AKAN MUNCUL DI SINI -->
-        <img id="ugc-image" src="" alt="Audiens" class="absolute bottom-0 right-[2%] lg:right-[5%] max-w-[50vw] h-[85vh] object-contain object-bottom z-10 mask-edges drop-shadow-[0_20px_50px_rgba(0,83,156,0.3)]">
+        <!-- FIX: Hapus onerror hide agar jika gambar lambat dimuat, tetap ditunggu browser -->
+        <img id="ugc-image" src="" class="absolute bottom-0 right-[2%] lg:right-[5%] max-w-[50vw] h-[85vh] object-contain object-bottom z-10 mask-edges drop-shadow-[0_20px_50px_rgba(0,83,156,0.3)]">
 
         <div class="qr-box text-white text-center flex flex-col items-center">
             <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://billboard.agenticaicenter.id/upload.html" alt="QR" class="rounded bg-white p-1 w-full">
@@ -85,7 +89,6 @@
         </div>
     </div>
 
-    <!-- SCRIPT POLLING SUPER RINGAN -->
     <script>
         const page1 = document.getElementById('page1');
         const page2 = document.getElementById('page2');
@@ -118,15 +121,16 @@
         // Cek file status.txt setiap 2 detik
         setInterval(async () => {
             try {
-                const res = await fetch('status.txt?t=' + new Date().getTime());
+                // FIX: Menambahkan "/" di depan untuk mengunci path ke root domain
+                const res = await fetch('/status.txt?t=' + new Date().getTime());
                 const currentStatus = await res.text();
 
                 if (currentStatus !== lastStatus && lastStatus !== 0) {
                     lastStatus = currentStatus;
                     
-                    // LANGSUNG GANTI KE HALAMAN 2 SAAT FOTO AI MATANG
                     console.log("Foto AI matang! Menampilkan ke Halaman 2...");
-                    ugcImage.src = 'uploads/hasil.jpg?t=' + new Date().getTime();
+                    // FIX: Menambahkan "/" di depan uploads
+                    ugcImage.src = '/uploads/hasil.jpg?t=' + new Date().getTime();
                     
                     if (loopInterval) clearInterval(loopInterval);
                     showPage(2);
@@ -134,7 +138,9 @@
                 } else if (lastStatus === 0) {
                     lastStatus = currentStatus;
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.log("Gagal memuat status");
+            }
         }, 2000);
 
         startLoop();
